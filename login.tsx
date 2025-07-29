@@ -11,6 +11,7 @@ const Login: React.FC<LoginProps> = ({ onClose, onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [loading, setLoading] = useState(false); // 로딩 상태 추가
 
   const handleLogin = async () => {
     setError('');
@@ -19,24 +20,39 @@ const Login: React.FC<LoginProps> = ({ onClose, onLoginSuccess }) => {
       return;
     }
 
+    setLoading(true); // 로딩 시작
     try {
-      const response = await fetch('http://localhost:3000/login', { // 실제 서버 주소로 변경해주세요.
+      const response = await fetch('http://localhost:8001/auth/login', { // 실제 서버 주소로 변경해주세요.
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify({ email, password }),
+        body: new URLSearchParams({
+          username: email,
+          password: password,
+        }).toString(),
       });
 
       if (response.ok) {
-        localStorage.setItem('isLoggedIn', 'true');
-        onLoginSuccess();
+        const data = await response.json();
+        if (data.access_token) {
+          await chrome.storage.local.set({
+            'jwtToken': data.access_token,
+            'tokenType': data.token_type
+          });
+          onLoginSuccess();
+        } else {
+          setError('로그인 성공했지만 토큰을 받지 못했습니다.');
+        }
       } else {
         const errorData = await response.json();
         setError(errorData.message || '이메일 또는 비밀번호가 올바르지 않습니다.');
       }
     } catch (error) {
-      setError('로그인 중 오류가 발생했습니다.');
+      console.error('Login error:', error);
+      setError('로그인 중 오류가 발생했습니다. 서버가 실행 중인지 확인해주세요.');
+    } finally {
+      setLoading(false); // 로딩 종료
     }
   };
 
@@ -51,8 +67,9 @@ const Login: React.FC<LoginProps> = ({ onClose, onLoginSuccess }) => {
       return;
     }
 
+    setLoading(true); // 로딩 시작
     try {
-      const response = await fetch('http://localhost:3000/signup', { // 실제 서버 주소로 변경해주세요.
+      const response = await fetch('http://localhost:8001/auth/register', { // 실제 서버 주소로 변경해주세요.
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -70,7 +87,9 @@ const Login: React.FC<LoginProps> = ({ onClose, onLoginSuccess }) => {
         setError(errorData.message || '회원가입 중 오류가 발생했습니다.');
       }
     } catch (error) {
-      setError('회원가입 중 오류가 발생했습니다.');
+      setError('회원가입 중 오류가 발생했습니다. 서버가 실행 중인지 확인해주세요.');
+    } finally {
+      setLoading(false); // 로딩 종료
     }
   };
 
@@ -84,7 +103,7 @@ const Login: React.FC<LoginProps> = ({ onClose, onLoginSuccess }) => {
     <div className="login-modal-overlay">
       <div className="login-modal-content">
         <h2>{mode === 'login' ? '로그인' : '회원가입'}</h2>
-        {error && <p>{error}</p>}
+        {error && <p className="error-message">{error}</p>}
 
         <div className="input-group">
           <div>
@@ -93,6 +112,7 @@ const Login: React.FC<LoginProps> = ({ onClose, onLoginSuccess }) => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              disabled={loading}
             />
           </div>
           <div>
@@ -101,6 +121,7 @@ const Login: React.FC<LoginProps> = ({ onClose, onLoginSuccess }) => {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              disabled={loading}
             />
           </div>
         </div>
@@ -108,29 +129,31 @@ const Login: React.FC<LoginProps> = ({ onClose, onLoginSuccess }) => {
         <div className="button-group">
           {mode === 'login' ? (
             <>
-              <>
               <button onClick={() => {
                 setMode('signup');
-                setEmail(''); // 이메일 초기화
-                setPassword(''); // 비밀번호 초기화
-              }}>회원가입</button>
-              <button onClick={handleLogin}>로그인</button>
-            </>
+                setEmail('');
+                setPassword('');
+                setError('');
+              }} disabled={loading}>회원가입</button>
+              <button onClick={handleLogin} disabled={loading}>
+                {loading ? '로그인 중...' : '로그인'}
+              </button>
             </>
           ) : (
             <>
-              <>
               <button onClick={() => {
                 setMode('login');
-                setEmail(''); // 이메일 초기화
-                setPassword(''); // 비밀번호 초기화
-              }}>로그인 화면으로</button>
-              <button onClick={handleSignup}>회원가입</button>
-            </>
+                setEmail('');
+                setPassword('');
+                setError('');
+              }} disabled={loading}>로그인 화면으로</button>
+              <button onClick={handleSignup} disabled={loading}>
+                {loading ? '가입 처리 중...' : '회원가입'}
+              </button>
             </>
           )}
         </div>
-        <button onClick={onClose}>닫기</button>
+        <button onClick={onClose} disabled={loading}>닫기</button>
       </div>
     </div>
   );

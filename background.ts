@@ -1,7 +1,7 @@
 // background.ts
 
 // https://192.168.18.124:9000/ , https://172.20.10.4:9000/extract-ylocations
-const API_BASE_URL = "https://localhost:1636";
+const API_BASE_URL = "http://localhost:8001";
 // 개발 중인 pind-web-map의 주소
 const WEB_MAP_BASE_URL = "http://localhost:5173";
 
@@ -11,11 +11,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "showMap") {
     // 1. 메시지를 보낸 탭(유튜브 페이지)의 URL을 가져옵니다.
     const youtubeUrl = message.url;
+    const jwtToken = message.jwtToken; // popup.tsx에서 전달받은 jwtToken
+    const tokenType = message.tokenType; // popup.tsx에서 전달받은 tokenType
+
     if (!youtubeUrl || !youtubeUrl.includes("youtube.com/watch?v=")) {
       console.error("메시지를 보낸 탭에서 유튜브 영상 URL을 찾을 수 없습니다.");
       return false; // 오류 발생 시 응답하지 않음
     }
     
+    if (!jwtToken || !tokenType) {
+      console.error("백그라운드: JWT 토큰 또는 토큰 타입이 없습니다.");
+      // 사용자에게 알림을 보낼 수도 있습니다.
+      chrome.notifications.create({
+        type: "basic",
+        iconUrl: "assets/icon-128.png",
+        title: "Pind 오류",
+        message: "로그인 토큰이 없어 요청을 보낼 수 없습니다. 다시 로그인해주세요."
+      });
+      return false;
+    }
+
     console.log("백그라운드: 유튜브 URL 감지 -", youtubeUrl);
 
     // 2. 비동기 작업을 위해 async 함수를 즉시 실행합니다.
@@ -25,7 +40,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         console.log(`백그라운드: FastAPI 서버(${API_BASE_URL})에 장소 추출 요청...`);
         const response = await fetch(`${API_BASE_URL}/api/v1/youtube/process`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `${tokenType} ${jwtToken}` // Authorization 헤더 추가
+          },
           body: JSON.stringify({ url: youtubeUrl }),
         });
 
