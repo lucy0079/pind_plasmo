@@ -1,6 +1,7 @@
 .location-finder-button {
+  order:-1 !important;
   display: flex;
-  align-items: center; /* 아이콘을 중앙에 정렬 */
+  align-items: center;
   justify-content: center;
   padding: 0 8px;
   background: none;
@@ -8,12 +9,9 @@
   cursor: pointer;
   height: 48px;
   width: 48px;
-  transform: translateY(24px);
   margin: 0 auto;
 }
-
 .location-finder-button img {
   width: 24px;
   height: 24px;
-  transform: translateX(10px); /* 아이콘을 오른쪽으로 밈 */
 }

@@ -22,18 +22,27 @@ function IndexPopup() {
       }
     })
 
-    // 로그인 상태 확인
-    const checkLoginStatus = async () => {
-      const result = await chrome.storage.local.get('jwtToken');
-      const loggedIn = !!result.jwtToken;
+    // 로그인 상태 및 세션 확인
+    const checkLoginAndSessionStatus = async () => {
+      const sessionResult = await chrome.storage.session.get('hasSkippedLogin');
+      if (sessionResult.hasSkippedLogin) {
+        // 로그인 건너뛰기를 선택한 경우
+        setIsLoggedIn(false); // 비로그인 상태로 유지
+        setShowLoginModal(false); // 로그인 모달을 띄우지 않음
+        return;
+      }
+
+      const localResult = await chrome.storage.local.get('jwtToken');
+      const loggedIn = !!localResult.jwtToken;
       setIsLoggedIn(loggedIn);
 
-      // 로그인되어 있지 않으면 로그인 모달을 바로 띄웁니다.
+      // 로그인되어 있지 않고, 건너뛰기도 선택하지 않은 경우에만 로그인 모달을 띄웁니다.
       if (!loggedIn) {
         setShowLoginModal(true);
       }
     };
-    checkLoginStatus();
+
+    checkLoginAndSessionStatus();
   }, [])
 
   const handleButtonClick = async () => {
@@ -91,6 +100,7 @@ function IndexPopup() {
 
       {showLoginModal && (
         <Login
+          url={url}
           onClose={() => setShowLoginModal(false)}
           onLoginSuccess={handleLoginSuccess}
         />
