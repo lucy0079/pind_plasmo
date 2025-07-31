@@ -1,37 +1,45 @@
 .login-modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 325px;
-  height: 336px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 320px;
+  min-height: 320px;
+  height: auto;
   background: #fff;
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 10000;
-  margin: auto;
-  right: 0;
-  bottom: 0;
+  padding: 0;   /* 위 여백도 0 */
 }
 
 .login-modal-content {
   width: 100%;
-  height: 100%;
+  max-width: 320px;
+  min-height: 280px; /* 320px → 280px으로 축소 */
+  /* height: auto; 유지 */
   background: #fff;
   box-sizing: border-box;
-  padding: 10px 12px;
+
+  /* 기존은 padding: 4px 8px 4px 8px; → 상단 padding을 8px로 늘림 */
+  padding: 8px 8px 4px 8px;
+
   border-radius: 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
+  gap: 10px;                   /* 전체 요소 간격 최소 */
   text-align: center;
+
+  max-height: 80vh;
+  overflow-y: auto;
 }
 
 .login-modal-content h2 {
-  margin-top: 3px;
-  margin-bottom: 10px;
-  font-size: 1.05em;
+  margin: 3px 0;         /* 위 0, 아래 3px만 */
+  font-size: 1.14em;
   color: #333;
 }
 
@@ -40,70 +48,157 @@
   max-width: 280px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 10px 0 5px;
+  gap: 2px;              /* 입력 란 간 간격도 최소 */
+  margin: 0;
   align-items: center;
 }
 
 .input-group div { width: 100%; }
 .input-group label {
   display: block;
-  margin-bottom: 2px;
-  font-size: 0.98em;
+  margin-bottom: 1px;
+  font-size: 1.05em;
   text-align: left;
 }
-
 .input-group input {
   width: 100%;
-  padding: 7px 8px;
-  border: 1px solid #ddd;
+  padding: 5px 8px;
+  border: 1.5px solid #d2d2d2;
   border-radius: 4px;
-  font-size: 1em;
+  font-size: 1.05em;
   box-sizing: border-box;
-  margin-bottom: 0px;
+  margin-bottom: 0;
 }
 
-.button-group {
+/* 가로 2개 버튼 (회원가입, 로그인 등) */
+.login-actions {
+  width: 100%;
+  /* margin-top: -40px; 기존 음수 마진 제거 */
+  margin-top: 0;
+  max-width: 280px;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 0 0;          /* 위쪽 공간 2px만 */
+}
+
+.modal-action-btn {
+  flex: 1 1 0;
+  min-width: 65px;
+  max-width: 140px;
+  height: 34px;                /* 버튼 높이 '딱' 고정 */
+  min-height: 34px;
+  max-height: 34px;
+  line-height: 34px;
+  font-size: 1.03em;
+  box-sizing: border-box;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.modal-action-btn:nth-of-type(1) { background: #4caf50; color: #fff; }
+.modal-action-btn:nth-of-type(2) { background: #008cba; color: #fff; }
+
+.bottom-links-group {
   width: 100%;
   max-width: 280px;
   display: flex;
-  justify-content: center;
-  gap: 5px;
-  margin-top: 0;
-  margin-bottom: 8px;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-top: 2px;             /* 위쪽 여백도 2px */
 }
 
-.login-modal-content button {
-  padding: 7px 0;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.97em;
-  width: 49%;
-  box-sizing: border-box;
-  cursor: pointer;
-}
-
-.login-modal-content button:nth-of-type(1) { background: #4caf50; color: #fff; }
-.login-modal-content button:nth-of-type(2) { background: #008cba; color: #fff; }
-.login-modal-content button:nth-of-type(3) { background: #f44336; color: #fff; }
-
-.login-modal-content > button:last-child {
-  margin-top: auto;
-  background: #999;
+.proceed-without-login-button {
+  background: #34bc85;
   color: #fff;
   width: 100%;
+  min-width: 120px;
+  max-width: 280px;
+  height: 34px;                /* 동일하게 고정 */
+  min-height: 34px;
+  max-height: 34px;
+  line-height: 34px;
+  font-size: 1.03em;
+  border: none;
+  border-radius: 4px;
+  box-sizing: border-box;
+  cursor: pointer;
+  margin: 0 0 2px 0;           /* 하단 2px만 */
+  padding: 0;
+}
+
+.bottom-links-group a {
+  display: block;
+  font-size: 1em;
+  color: #007bff;
+  text-decoration: none;
+  margin: 0;
+  padding: 0;
+  white-space: normal;
+  word-break: keep-all;
+  width: 100%;
+  text-align: center;
+}
+
+.login-modal-content p.error-message {
+  font-size: 1em;
+  margin: 0 0 2px 0;
+  color: red;
+}
+
+/* 닫기 버튼 (작게, 하단) */
+.login-modal-content > button:last-child {
+  margin-top: 7px;
+  background: #26692a;
+  color: #fff;
+  width: 48%;
   max-width: 90px;
-  padding: 7px 0;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  line-height: 32px;
+  padding: 0;
   font-size: 0.95em;
+  overflow: visible;
   align-self: center;
 }
 
-.login-modal-content p {
-  font-size: 0.9em;
-  margin: 4px 0 0 0;
-  color: red;
-  min-height: 1.5em;
+/* 오버레이(비로그인 안내 모달 등) */
+.confirmation-overlay {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10001;
 }
-body, html, .login-modal-overlay {
-  overflow: hidden;
+.confirmation-box {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  width: 80%;
+  max-width: 250px;
+}
+.confirmation-buttons {
+  display: flex; justify-content: center; gap: 10px;
+}
+.confirmation-buttons button {
+  padding: 8px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1em;
+}
+.confirmation-buttons button:nth-of-type(1) {
+  background: #4caf50; color: #fff;
+}
+.confirmation-buttons button:nth-of-type(2) {
+  background: #f44336; color: #fff;
 }

@@ -80,15 +80,9 @@ function IndexPopup() {
       <p className="url-text">현재 URL: {url || "로딩 중..."}</p>
       
       {isYoutubeVideo ? (
-        isLoggedIn ? (
-          <button onClick={handleButtonClick}>
-            영상 속 장소 지도 보기
-          </button>
-        ) : (
-          <button onClick={handleButtonClick}>
-            로그인 / 회원가입
-          </button>
-        )
+        <button onClick={handleButtonClick}>
+          영상 속 장소 지도 보기
+        </button>
       ) : (
         <p className="warning-message">이 페이지는 유튜브 영상 페이지가 아닙니다.</p>
       )}
@@ -96,7 +90,10 @@ function IndexPopup() {
       {message && <p className="status-message">{message}</p>}
 
       {showLoginModal && (
-        <Login onClose={() => setShowLoginModal(false)} onLoginSuccess={handleLoginSuccess} />
+        <Login
+          onClose={() => setShowLoginModal(false)}
+          onLoginSuccess={handleLoginSuccess}
+        />
       )}
     </div>
   )

@@ -1,7 +1,7 @@
 // background.ts
 
 // https://192.168.18.124:9000/ , https://172.20.10.4:9000/extract-ylocations
-const API_BASE_URL = "http://localhost:8001";
+const API_BASE_URL = "http://localhost:8000";
 // 개발 중인 pind-web-map의 주소
 const WEB_MAP_BASE_URL = "http://localhost:5173";
 
@@ -18,32 +18,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       console.error("메시지를 보낸 탭에서 유튜브 영상 URL을 찾을 수 없습니다.");
       return false; // 오류 발생 시 응답하지 않음
     }
-    
-    if (!jwtToken || !tokenType) {
-      console.error("백그라운드: JWT 토큰 또는 토큰 타입이 없습니다.");
-      // 사용자에게 알림을 보낼 수도 있습니다.
-      chrome.notifications.create({
-        type: "basic",
-        iconUrl: "assets/icon-128.png",
-        title: "Pind 오류",
-        message: "로그인 토큰이 없어 요청을 보낼 수 없습니다. 다시 로그인해주세요."
-      });
-      return false;
-    }
 
     console.log("백그라운드: 유튜브 URL 감지 -", youtubeUrl);
 
     // 2. 비동기 작업을 위해 async 함수를 즉시 실행합니다.
     (async () => {
       try {
-        // 3. FastAPI 백엔드 서버에 POST 요청을 보냅니다.
-        console.log(`백그라운드: FastAPI 서버(${API_BASE_URL})에 장소 추출 요청...`);
-        const response = await fetch(`${API_BASE_URL}/api/v1/youtube/process`, {
+        let apiUrl = `${API_BASE_URL}/api/v1/youtube/process`;
+        const headers: HeadersInit = {
+          "Content-Type": "application/json",
+        };
+
+        if (jwtToken && tokenType) {
+          // 로그인 사용자
+          headers["Authorization"] = `${tokenType} ${jwtToken}`;
+          console.log(`백그라운드: 로그인 사용자용 FastAPI 서버(${apiUrl})에 장소 추출 요청...`);
+        } else {
+          // 비로그인 사용자
+          apiUrl = `${API_BASE_URL}/api/v1/youtube/without-login/process`;
+          console.log(`백그라운드: 비로그인 사용자용 FastAPI 서버(${apiUrl})에 장소 추출 요청...`);
+        }
+
+        const response = await fetch(apiUrl, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `${tokenType} ${jwtToken}` // Authorization 헤더 추가
-          },
+          headers: headers,
           body: JSON.stringify({ url: youtubeUrl }),
         });
 
@@ -52,7 +50,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         if (!response.ok) {
           // 실패 시, 이미 읽은 데이터에서 에러 메시지를 사용합니다.
-          throw new Error(data.error || `백엔드 서버 오류: ${response.statusText}`);
+          throw new Error(data.detail || `백엔드 서버 오류: ${response.statusText}`);
         }
 
         const locations = data; // 성공 시, 저장된 데이터를 사용합니다.
@@ -75,7 +73,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         });
       }
     })();
-    
+
     // 비동기적으로 응답할 것임을 Chrome에 알립니다.
     return true;
   } else if (message.type === "openPopup") {

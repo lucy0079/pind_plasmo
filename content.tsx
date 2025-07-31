@@ -24,6 +24,21 @@ const YouTubeButton = () => {
     checkLoginStatus();
   }, []);
 
+  useEffect(() => {
+    const handleMessage = (message: any) => {
+      if (message.action === 'proceedWithoutLogin') {
+        console.log("콘텐츠 스크립트: 로그인 없이 진행 메시지 수신.");
+        chrome.runtime.sendMessage({ type: "showMap", url: window.location.href, jwtToken: null, tokenType: null });
+      }
+    };
+
+    chrome.runtime.onMessage.addListener(handleMessage);
+
+    return () => {
+      chrome.runtime.onMessage.removeListener(handleMessage);
+    };
+  }, []);
+
   const handleButtonClick = async () => { // async 키워드 추가
     if (isLoggedIn) {
       console.log("콘텐츠 스크립트: 버튼 클릭, 백그라운드에 메시지 전송.");
