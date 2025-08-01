@@ -35,7 +35,7 @@ const Login: React.FC<LoginProps> = ({ onClose, onLoginSuccess }) => {
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/auth/login', {
+      const response = await fetch('http://localhost:9001/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ username: email, password }).toString(),
@@ -77,7 +77,7 @@ const Login: React.FC<LoginProps> = ({ onClose, onLoginSuccess }) => {
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/auth/register', {
+      const response = await fetch('http://localhost:9001/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -106,7 +106,7 @@ const Login: React.FC<LoginProps> = ({ onClose, onLoginSuccess }) => {
     }
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/auth/request-password-reset', {
+      const response = await fetch('http://localhost:9001/auth/request-password-reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
