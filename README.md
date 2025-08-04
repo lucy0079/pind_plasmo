@@ -42,7 +42,7 @@ Pind Plasmo는 현재 보고 있는 웹 페이지에 핀을 꽂아 나중에 다
 2.  **백엔드 서버 실행**:
     *   백엔드 서버 디렉토리에서 다음 명령어를 사용하여 서버를 실행합니다.
     ```bash
-    uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
+    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
     ```
     (여기서 `app.main:app`은 FastAPI 애플리케이션의 진입점 파일과 변수명에 따라 다를 수 있습니다.)
 
