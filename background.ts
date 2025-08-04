@@ -1,7 +1,7 @@
 // background.ts
 
 // https://192.168.18.124:9000/ , https://172.20.10.4:9000/extract-ylocations
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = "http://localhost:9001";
 // 개발 중인 pind-web-map의 주소
 const WEB_MAP_BASE_URL = "http://localhost:5173";
 
