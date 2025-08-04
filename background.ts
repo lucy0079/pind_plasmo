@@ -3,7 +3,7 @@
 // https://192.168.18.124:9000/ , https://172.20.10.4:9000/extract-ylocations
 const API_BASE_URL = "http://localhost:9001";
 // 개발 중인 pind-web-map의 주소
-const WEB_MAP_BASE_URL = "http://localhost:5174";
+const WEB_MAP_BASE_URL = "http://localhost:5173";
 
 // content.tsx 또는 popup.tsx로부터 메시지를 받기 위한 리스너
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
