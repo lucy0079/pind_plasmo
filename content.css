@@ -1,17 +1,1 @@
-.location-finder-button {
-  order:-1 !important;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 8px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  height: 48px;
-  width: 48px;
-  margin: 0 auto;
-}
-.location-finder-button img {
-  width: 24px;
-  height: 24px;
-}
+/* 이 파일은 content.tsx의 getStyle() 함수로 대체되었습니다. */

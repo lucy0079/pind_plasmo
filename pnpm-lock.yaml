@@ -15,8 +15,8 @@ importers:
         specifier: 0.90.5
         version: 0.90.5(@swc/core@1.13.2(@swc/helpers@0.5.17))(@swc/helpers@0.5.17)(@types/node@20.11.5)(postcss@8.5.6)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       pnpm:
-        specifier: ^10.13.1
-        version: 10.13.1
+        specifier: ^10.14.0
+        version: 10.14.0
       react:
         specifier: 18.2.0
         version: 18.2.0
@@ -2594,8 +2594,8 @@ packages:
     resolution: {integrity: sha512-VRFsRCHTKCDSRz7ZGmN4hCFqrHE8z7vDYqJK63v5gjRs+EUFdfEciQyGhPmG5NkT+yPvmMZO+R/j1HU/pg2BKA==}
     hasBin: true
 
-  pnpm@10.13.1:
-    resolution: {integrity: sha512-N+vxpcejDV+r4MXfRO6NpMllygxa89urKMOhaBtwolYhjQXIHJwNz3Z+9rhVHrW5YAQrntQwDFkkIzY3fgHPrQ==}
+  pnpm@10.14.0:
+    resolution: {integrity: sha512-rSenlkG0nD5IGhaoBbqnGBegS74Go40X5g4urug/ahRsamiBJfV5LkjdW6MOfaUqXNpMOZK5zPMz+c4iOvhHSA==}
     engines: {node: '>=18.12'}
     hasBin: true
 
@@ -5904,7 +5904,7 @@ snapshots:
       - walrus
       - whiskers
 
-  pnpm@10.13.1: {}
+  pnpm@10.14.0: {}
 
   postcss-load-config@4.0.2(postcss@8.5.6):
     dependencies:

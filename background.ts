@@ -72,29 +72,26 @@ async function processAndShowMap(youtubeUrl: string, jwtToken?: string, tokenTyp
 // content.tsx 또는 popup.tsx로부터 메시지를 받기 위한 리스너
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "handleIconClick") {
-    console.log("백그라운드: 아이콘 클릭 이벤트 수신. 상태 확인 시작...");
-    const youtubeUrl = message.url;
-
+    console.log(`백그라운드: ${message.type} 이벤트 수신.`);
     (async () => {
-      const localData = await chrome.storage.local.get('jwtToken');
-      const sessionData = await chrome.storage.session.get('hasSkippedLogin');
+      const localResult = await chrome.storage.local.get(['jwtToken', 'tokenType']);
+      const sessionResult = await chrome.storage.session.get('hasSkippedLogin');
 
-      const isLoggedIn = !!localData.jwtToken;
-      const hasSkippedLogin = !!sessionData.hasSkippedLogin;
-
-      if (isLoggedIn || hasSkippedLogin) {
-        console.log("백그라운드: 로그인 또는 건너뛰기 상태 확인. 지도 표시 로직 실행...");
-        console.log("백그라운드: handleIconClick - youtubeUrl:", youtubeUrl);
-        const tokenData = await chrome.storage.local.get(['jwtToken', 'tokenType']);
-        console.log("백그라운드: handleIconClick - tokenData:", tokenData);
-        processAndShowMap(youtubeUrl, tokenData.jwtToken, tokenData.tokenType);
-
+      if (localResult.jwtToken || sessionResult.hasSkippedLogin) {
+        // 로그인이 되어 있거나, 비회원 로그인을 선택한 경우
+        console.log("백그라운드: 로그인 또는 비회원 로그인 상태 확인. 지도 표시 로직 실행...");
+        processAndShowMap(message.url, localResult.jwtToken, localResult.tokenType);
       } else {
-        console.log("백그라운드: 로그인/건너뛰기 상태 없음. 팝업 열기 실행...");
+        // 로그인도, 비회원 로그인도 아닌 경우 팝업을 띄웁니다.
+        console.log("백그라운드: 로그인 정보 없음. chrome.action.openPopup() 호출...");
         chrome.action.openPopup();
       }
     })();
-    
-    return true; // 비동기 응답
+    return true; // 비동기 처리를 위해 true 반환
+  } else if (message.type === "showMap") {
+    // 팝업에서 "지도 보기" 버튼을 클릭했을 때 (로그인 또는 비회원)
+    console.log(`백그라운드: ${message.type} 이벤트 수신. 지도 표시 로직 실행...`);
+    processAndShowMap(message.url, message.jwtToken, message.tokenType);
+    return true;
   }
 });
