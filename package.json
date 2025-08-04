@@ -27,7 +27,7 @@
   },
   "manifest": {
     "host_permissions": [
-      "http://localhost:9001/*",
+      "http://localhost:8000/*",
       "https://www.youtube.com/*"
     ],
     "web_accessible_resources": [
