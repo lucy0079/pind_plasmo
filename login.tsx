@@ -2,21 +2,20 @@ import React, { useState } from 'react';
 import './login.css';
 
 interface LoginProps {
-  url: string;              // 지도를 띄울 URL
-  onClose: () => void;      // 로그인 모달 닫기
-  onLoginSuccess: () => void; // 부모에게 로그인 성공 알림
+  url: string;
+  onClose: () => void;
+  onLoginSuccess: () => void;
+  onSkipLoginSuccess: () => void; 
 }
 
-const Login: React.FC<LoginProps> = ({ url, onClose, onLoginSuccess }) => {
-  /* ───────── 상태 ───────── */
-  const [email, setEmail]               = useState('');
-  const [password, setPassword]         = useState('');
-  const [error, setError]               = useState('');
-  const [mode, setMode]                 = useState<'login' | 'signup' | 'forgot-password'>('login');
-  const [loading, setLoading]           = useState(false);
+const Login: React.FC<LoginProps> = ({ url, onClose, onLoginSuccess, onSkipLoginSuccess }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot-password'>('login');
+  const [loading, setLoading] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
 
-  /* ───────── 공통 유틸 ───────── */
   const isValidEmail = (email: string) => {
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     return emailRegex.test(email);
@@ -28,7 +27,6 @@ const Login: React.FC<LoginProps> = ({ url, onClose, onLoginSuccess }) => {
     setLoading(false);
   };
 
-  /* ───────── 로그인 ───────── */
   const handleLogin = async () => {
     setError('');
     if (!isValidEmail(email)) {
@@ -47,10 +45,10 @@ const Login: React.FC<LoginProps> = ({ url, onClose, onLoginSuccess }) => {
       if (response.ok) {
         const data = await response.json();
         if (data.access_token) {
-          // 크롬 스토리지에 JWT 보관
           await chrome.storage.local.set({
             jwtToken: data.access_token,
             tokenType: data.token_type,
+            userEmail: email, // 이메일 저장
           });
           onLoginSuccess();
         } else {
@@ -62,7 +60,6 @@ const Login: React.FC<LoginProps> = ({ url, onClose, onLoginSuccess }) => {
         setEmail('');
         setPassword('');
         setMode('login');
-        
       }
     } catch (err) {
       console.error('Login error:', err);
@@ -72,7 +69,6 @@ const Login: React.FC<LoginProps> = ({ url, onClose, onLoginSuccess }) => {
     }
   };
 
-  /* ───────── 회원가입 ───────── */
   const handleSignup = async () => {
     setError('');
     if (!isValidEmail(email)) {
@@ -107,7 +103,6 @@ const Login: React.FC<LoginProps> = ({ url, onClose, onLoginSuccess }) => {
     }
   };
 
-  /* ───────── 비밀번호 찾기 ───────── */
   const handleForgotPassword = async () => {
     setError('');
     if (!isValidEmail(email)) {
@@ -137,11 +132,9 @@ const Login: React.FC<LoginProps> = ({ url, onClose, onLoginSuccess }) => {
     }
   };
 
-  /* ───────── 렌더 ───────── */
   return (
     <div className="login-modal-overlay">
       <div className="login-modal-content">
-        {/* 제목 */}
         <h2>
           {mode === 'login'
             ? '로그인'
@@ -150,10 +143,8 @@ const Login: React.FC<LoginProps> = ({ url, onClose, onLoginSuccess }) => {
             : '비밀번호 찾기'}
         </h2>
 
-        {/* 에러 메시지 */}
         {error && <p className="error-message">{error}</p>}
 
-        {/* 비로그인 사용 시 확인 모달 */}
         {showConfirmation && (
           <div className="confirmation-overlay">
             <div className="confirmation-box">
@@ -162,14 +153,7 @@ const Login: React.FC<LoginProps> = ({ url, onClose, onLoginSuccess }) => {
                 <button
                   onClick={async () => {
                     await chrome.storage.session.set({ hasSkippedLogin: true });
-                    // 즉시 지도 요청
-                    chrome.runtime.sendMessage({
-                      type: 'showMap',
-                      url,
-                      jwtToken: null,
-                      tokenType: null,
-                    });
-                    onClose();
+                    onSkipLoginSuccess();
                   }}
                 >
                   확인
@@ -180,7 +164,6 @@ const Login: React.FC<LoginProps> = ({ url, onClose, onLoginSuccess }) => {
           </div>
         )}
 
-        {/* 입력 폼 */}
         <div className="input-group">
           <div>
             <label>이메일:</label>
@@ -205,7 +188,6 @@ const Login: React.FC<LoginProps> = ({ url, onClose, onLoginSuccess }) => {
           )}
         </div>
 
-        {/* 액션 버튼들 */}
         <div className="login-actions">
           {mode === 'login' ? (
             <>
@@ -270,7 +252,6 @@ const Login: React.FC<LoginProps> = ({ url, onClose, onLoginSuccess }) => {
           )}
         </div>
 
-        {/* 하단 링크 모음 (로그인 화면 전용) */}
         {mode === 'login' && (
           <div className="bottom-links-group">
             <button

@@ -42,25 +42,20 @@ export const getStyle = () => {
   return style
 }
 
-
 const locationIconUrl = chrome.runtime.getURL("assets/location.png")
-
 
 export const config: PlasmoCSConfig = {
   matches: ["https://www.youtube.com/watch*"]
 }
 
-// 아이콘을 오른쪽 컨트롤 패널에 삽입합니다. (가장 안정적인 기본 설정)
 export const getInlineAnchor: PlasmoGetInlineAnchor = () =>
   document.querySelector(".ytp-right-controls")
 
 export const getShadowHostId = () => "pind-youtube-button"
 
-
 const YouTubeButton = () => {
-  // Button click sends a message to the background script
   const handleButtonClick = () => {
-    console.log("콘텐츠 스크립트: 아이콘 클릭. 백그라운드에 상태 확인 요청.");
+    console.log("콘텐츠 스크립트: 아이콘 클릭. 백그라운드에 팝업 요청.");
     chrome.runtime.sendMessage({
       type: "handleIconClick",
       url: window.location.href
