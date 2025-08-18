@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import "~popup.css";
-import Login from "./login"; // login.tsx import
 import LoadingIndicator from "./LoadingIndicator";
+
+// The login page URL
+const LOGIN_URL = "http://localhost:3000/?auth=login";
 
 function IndexPopup() {
   const [url, setUrl] = useState<string | null>(null);
   const [message, setMessage] = useState<string>("");
   const [isYoutubeVideo, setIsYoutubeVideo] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [percentage, setPercentage] = useState(0);
@@ -23,7 +24,7 @@ function IndexPopup() {
 
   const startProgressTimer = (duration: number, limit = 90) => {
     stopProgressTimer();
-    const intervalTime = duration / (limit * 1.1); // 90%까지 도달하는 시간을 예측 시간보다 약간 빠르게 설정
+    const intervalTime = duration / (limit * 1.1);
     intervalRef.current = setInterval(() => {
       setPercentage((prev) => {
         if (prev >= limit) {
@@ -40,12 +41,11 @@ function IndexPopup() {
     setLoadingMessage("요청 준비 중...");
     setPercentage(0);
 
-    const localResult = await chrome.storage.local.get(['jwtToken', 'tokenType']);
+    const { jwtToken, tokenType } = await chrome.storage.local.get(['jwtToken', 'tokenType']);
     const port = chrome.runtime.connect({ name: "loading-status" });
 
     port.onMessage.addListener((msg) => {
       if (msg.status === "starting") {
-        // 백그라운드에서 받은 예측 시간으로 타이머 시작
         startProgressTimer(msg.estimatedDuration, 90);
       } else if (msg.status === "extracting") {
         setLoadingMessage("장소 추출 중...");
@@ -55,7 +55,7 @@ function IndexPopup() {
         setTimeout(() => {
           setLoadingMessage("지도에 표시 중...");
           setPercentage(0);
-          startProgressTimer(500, 95); // 2단계는 0.5초로 고정
+          startProgressTimer(500, 95);
         }, 300);
       } else if (msg.status === "complete") {
         stopProgressTimer();
@@ -74,8 +74,8 @@ function IndexPopup() {
     port.postMessage({
       type: "showMap",
       url: pendingUrl,
-      jwtToken: localResult.jwtToken,
-      tokenType: localResult.tokenType
+      jwtToken: jwtToken,
+      tokenType: tokenType
     });
 
     await chrome.storage.session.remove('pendingUrl');
@@ -93,24 +93,14 @@ function IndexPopup() {
     });
 
     const checkStatus = async () => {
-      const sessionData = await chrome.storage.session.get(['hasSkippedLogin', 'pendingUrl']);
-      const localData = await chrome.storage.local.get('jwtToken');
-      const isLoggedIn = !!localData.jwtToken;
-      const hasSkipped = !!sessionData.hasSkippedLogin;
+      const { jwtToken } = await chrome.storage.local.get('jwtToken');
+      setIsLoggedIn(!!jwtToken);
 
-      setIsLoggedIn(isLoggedIn);
-
-      const canProcess = isLoggedIn || hasSkipped;
-
-      if (sessionData.pendingUrl) {
-        if (canProcess) {
-          startProcessingPendingUrl(sessionData.pendingUrl);
-        } else {
-          setShowLoginModal(true);
-        }
-      } else {
-        if (!canProcess) {
-          setShowLoginModal(true);
+      // Automatically start processing if logged in and a URL is pending.
+      if (!!jwtToken) {
+        const { pendingUrl } = await chrome.storage.session.get('pendingUrl');
+        if (pendingUrl) {
+          startProcessingPendingUrl(pendingUrl);
         }
       }
     };
@@ -122,37 +112,19 @@ function IndexPopup() {
     };
   }, []);
 
-  const handleButtonClick = async () => {
-    const result = await chrome.storage.session.get('pendingUrl');
-    if (result.pendingUrl) {
-        startProcessingPendingUrl(result.pendingUrl);
+  const handleProcessClick = async () => {
+    const { pendingUrl } = await chrome.storage.session.get('pendingUrl');
+    if (pendingUrl) {
+        startProcessingPendingUrl(pendingUrl);
     } else if (url) {
         await chrome.storage.session.set({ pendingUrl: url });
         startProcessingPendingUrl(url);
     }
   };
 
-  const handleLoginSuccess = async () => {
-    setIsLoggedIn(true);
-    setShowLoginModal(false);
-    setMessage("로그인 성공!");
-
-    const result = await chrome.storage.session.get('pendingUrl');
-    if (result.pendingUrl) {
-      startProcessingPendingUrl(result.pendingUrl);
-    } else {
-      window.close();
-    }
-  };
-
-  const handleSkipLoginSuccess = async () => {
-    setShowLoginModal(false);
-    const result = await chrome.storage.session.get('pendingUrl');
-    if (result.pendingUrl) {
-      startProcessingPendingUrl(result.pendingUrl);
-    } else {
-      window.close();
-    }
+  const handleLoginClick = () => {
+    chrome.tabs.create({ url: LOGIN_URL });
+    window.close(); // Close the popup after opening the login tab
   };
 
   return (
@@ -162,9 +134,15 @@ function IndexPopup() {
       <p className="url-text">현재 URL: {url || "로딩 중..."}</p>
 
       {isYoutubeVideo ? (
-        <button onClick={handleButtonClick} disabled={loading || showLoginModal}>
-          {loading ? "처리 중..." : "영상 속 장소 지도 보기"}
-        </button>
+        isLoggedIn ? (
+          <button onClick={handleProcessClick} disabled={loading}>
+            {loading ? "처리 중..." : "영상 속 장소 지도 보기"}
+          </button>
+        ) : (
+          <button onClick={handleLoginClick} disabled={loading}>
+            로그인 하러 이동
+          </button>
+        )
       ) : (
         <p className="warning-message">
           이 페이지는 유튜브 영상 페이지가 아닙니다.
@@ -172,15 +150,6 @@ function IndexPopup() {
       )}
 
       {message && <p className="status-message">{message}</p>}
-
-      {showLoginModal && (
-        <Login
-          url={url}
-          onClose={() => setShowLoginModal(false)}
-          onLoginSuccess={handleLoginSuccess}
-          onSkipLoginSuccess={handleSkipLoginSuccess}
-        />
-      )}
     </div>
   );
 }

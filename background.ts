@@ -105,3 +105,46 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 });
+
+const AUTH_CALLBACK_URL = "http://localhost:3000/auth/callback";
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tab.url?.startsWith(AUTH_CALLBACK_URL)) {
+    try {
+      const url = new URL(tab.url);
+      const params = new URLSearchParams(url.search);
+      const jwtToken = params.get('token');
+      const tokenType = params.get('token_type');
+      const userEmail = params.get('user_email'); // Assuming email is also passed
+
+      if (jwtToken && tokenType) {
+        await chrome.storage.local.set({
+          jwtToken: jwtToken,
+          tokenType: tokenType,
+          userEmail: userEmail || '' // Save email if provided
+        });
+        console.log("백그라운드: 토큰 저장 성공!");
+
+        // Close the login tab
+        chrome.tabs.remove(tabId);
+
+        // Optional: Notify the user of success
+        chrome.notifications.create({
+          type: "basic",
+          iconUrl: chrome.runtime.getURL("assets/icon.png"),
+          title: "로그인 성공",
+          message: "Pind에 성공적으로 로그인되었습니다."
+        });
+
+      }
+    } catch (error) {
+      console.error("백그라운드: 토큰 처리 중 오류 발생:", error);
+      chrome.notifications.create({
+        type: "basic",
+        iconUrl: chrome.runtime.getURL("assets/icon.png"),
+        title: "로그인 오류",
+        message: "로그인 처리 중 오류가 발생했습니다."
+      });
+    }
+  }
+});
