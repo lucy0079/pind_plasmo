@@ -54,8 +54,35 @@ export const getInlineAnchor: PlasmoGetInlineAnchor = () =>
 export const getShadowHostId = () => "pind-youtube-button"
 
 const YouTubeButton = () => {
-  const handleButtonClick = () => {
-    console.log("콘텐츠 스크립트: 아이콘 클릭. 백그라운드에 팝업 요청.");
+  const [isLoggedIn, setIsLoggedIn] = React.useState(false);
+
+  React.useEffect(() => {
+    // 초기 로그인 상태 확인
+    const checkLoginStatus = async () => {
+      const { jwtToken } = await chrome.storage.local.get('jwtToken');
+      setIsLoggedIn(!!jwtToken);
+    };
+    checkLoginStatus();
+
+    // 백그라운드에서 로그인 성공 메시지 수신
+    const messageListener = (message: any) => {
+      if (message.type === "loginSuccess") {
+        console.log("콘텐츠 스크립트: 로그인 성공 메시지 수신");
+        setIsLoggedIn(true);
+      }
+    };
+
+    chrome.runtime.onMessage.addListener(messageListener);
+
+    return () => {
+      chrome.runtime.onMessage.removeListener(messageListener);
+    };
+  }, []);
+
+  const handleButtonClick = async () => {
+    console.log("콘텐츠 스크립트: 아이콘 클릭. 팝업 열기.");
+    
+    // 로그인 상태에 관계없이 항상 팝업 열기
     chrome.runtime.sendMessage({
       type: "handleIconClick",
       url: window.location.href
