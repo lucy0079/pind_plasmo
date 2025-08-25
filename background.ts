@@ -53,6 +53,13 @@ function getFriendlyMessage(serverMessage: string, progress: number): string {
 async function processAndShowMap(youtubeUrl: string, jwtToken: string, tokenType: string) {
   const startTime = Date.now();
   
+  console.log('[PIND_DEBUG] processAndShowMap started with:', {
+    youtubeUrl: youtubeUrl,
+    hasJwtToken: !!jwtToken,
+    jwtTokenLength: jwtToken?.length,
+    tokenType: tokenType
+  });
+  
   try {
     statusUpdatePort?.postMessage({ status: "extracting" });
 
@@ -78,20 +85,55 @@ async function processAndShowMap(youtubeUrl: string, jwtToken: string, tokenType
 
     const locations = data;
     const locationsData = JSON.stringify(locations);
-    let finalUrl = `${WEB_MAP_BASE_URL}?locations=${encodeURIComponent(locationsData)}`;
+    // 로그인된 사용자는 dashboard로 이동
+    let finalUrl = `${WEB_MAP_BASE_URL}/dashboard?locations=${encodeURIComponent(locationsData)}`;
 
     const storedData = await chrome.storage.local.get('userEmail');
     const userEmail = storedData.userEmail || 'unknown@example.com';
-    finalUrl += `&token=${encodeURIComponent(jwtToken)}&token_type=${encodeURIComponent(tokenType)}&user_email=${encodeURIComponent(userEmail)}`;
-    console.log('[PIND_PLASMO] Creating URL with auth:', finalUrl);
+    
+    console.log('[PIND_DEBUG] Before URL construction:', {
+      hasJwtToken: !!jwtToken,
+      jwtTokenLength: jwtToken?.length,
+      tokenType: tokenType,
+      userEmail: userEmail,
+      locations: locations
+    });
+    
+    finalUrl += `&token=${encodeURIComponent(jwtToken)}&token_type=${encodeURIComponent(tokenType)}&user_email=${encodeURIComponent(userEmail)}&auto_login=true&source=extension`;
+    
+    console.log('[PIND_DEBUG] Final URL parts:', {
+      jwtTokenFirst10: jwtToken.substring(0, 10),
+      jwtTokenLast10: jwtToken.substring(jwtToken.length - 10),
+      encodedToken: encodeURIComponent(jwtToken).substring(0, 50) + '...',
+      tokenType: tokenType,
+      userEmail: userEmail
+    });
+    console.log('[PIND_PLASMO] Creating dashboard URL with auth:', finalUrl);
+    console.log('[PIND_PLASMO] URL components:', {
+      baseUrl: `${WEB_MAP_BASE_URL}/dashboard`,
+      hasLocations: !!locations,
+      hasToken: !!jwtToken,
+      userEmail: userEmail
+    });
 
     // 분석 결과를 저장하고 팝업에 알림 (바로 웹 맵 열지 않음)
-    await chrome.storage.local.set({ analysisResult: finalUrl });
+    await chrome.storage.local.set({ 
+      analysisResult: finalUrl,
+      analysisStatus: "completed",
+      analysisMessage: "Analysis complete!"
+    });
     statusUpdatePort?.postMessage({ status: "complete" });
 
   } catch (error) {
     console.error("백그라운드 처리 중 오류 발생:", error);
     const errorMessage = error instanceof Error ? error.message : "장소 추출 중 오류가 발생했습니다.";
+    
+    // Storage에 오류 상태 저장
+    await chrome.storage.local.set({ 
+      analysisStatus: "error",
+      analysisMessage: "An error occurred during analysis. Please try again later."
+    });
+    
     statusUpdatePort?.postMessage({ status: "error", message: errorMessage });
     chrome.notifications.create({
       type: "basic",
@@ -108,237 +150,6 @@ async function processAndShowMap(youtubeUrl: string, jwtToken: string, tokenType
   }
 }
 
-// 백그라운드 전용 분석 함수 (job 기반 API 사용)
-async function processAndShowMapInBackground(youtubeUrl: string, jwtToken: string, tokenType: string, retryCount: number = 0) {
-  const startTime = Date.now();
-  const maxRetries = 2; // 최대 2회 재시도 (총 3회 시도)
-  
-  console.log(`🚀 processAndShowMapInBackground 함수 시작!`, { 
-    youtubeUrl, 
-    hasJwtToken: !!jwtToken, 
-    tokenType, 
-    retryCount,
-    API_BASE_URL 
-  });
-  
-  try {
-    console.log(`백그라운드: 분석 시작 - Job 제출 (시도 ${retryCount + 1}/${maxRetries + 1})`);
-
-    // Step 1: Job 제출
-    const apiUrl = `${API_BASE_URL}/api/v1/youtube/process`;
-    const headers: HeadersInit = { 
-      "Content-Type": "application/json",
-      "Authorization": `${tokenType} ${jwtToken}`
-    };
-
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: headers,
-      body: JSON.stringify({ url: youtubeUrl }),
-    });
-
-    const jobData = await response.json();
-
-    if (!response.ok) {
-      throw new Error(jobData.detail || `백엔드 서버 오류: ${response.statusText}`);
-    }
-
-    console.log("백그라운드: Job 제출 완료, job_id:", jobData.job_id);
-
-    // Step 2: Job 폴링하여 결과 대기
-    const result = await pollForJobCompletion(jobData.job_id);
-    
-    console.log("백그라운드: 분석 완료, 결과 저장 중");
-
-    // Step 3: 결과를 이용해 웹 맵 URL 생성
-    const locationsData = JSON.stringify(result.places || []);
-    let finalUrl = `${WEB_MAP_BASE_URL}/dashboard?locations=${encodeURIComponent(locationsData)}`;
-
-    const storedData = await chrome.storage.local.get('userEmail');
-    const userEmail = storedData.userEmail || 'unknown@example.com';
-    finalUrl += `&token=${encodeURIComponent(jwtToken)}&token_type=${encodeURIComponent(tokenType)}&user_email=${encodeURIComponent(userEmail)}`;
-    console.log('[PIND_PLASMO] Creating URL with auth:', finalUrl);
-
-    // 분석 결과를 저장하고 완료 상태로 변경
-    await chrome.storage.local.set({ 
-      analysisResult: finalUrl,
-      analysisStatus: "completed",
-      analysisMessage: "분석 완료! 지도를 확인하세요."
-    });
-
-    console.log("백그라운드: 분석 결과 저장 완료");
-    console.log("백그라운드: 최종 생성된 URL:", finalUrl);
-
-  } catch (error) {
-    console.error(`백그라운드 분석 중 오류 발생 (시도 ${retryCount + 1}):`, error);
-    const errorMessage = error instanceof Error ? error.message : "장소 추출 중 알 수 없는 오류가 발생했습니다.";
-    
-    // JWT 토큰 만료/무효화 확인
-    const isAuthError = errorMessage.includes('Could not validate credentials') ||
-                       errorMessage.includes('Unauthorized') ||
-                       errorMessage.includes('401');
-    
-    if (isAuthError) {
-      console.log("백그라운드: JWT 토큰 만료 감지 - 로그인 상태 초기화");
-      // 만료된 토큰 제거
-      await chrome.storage.local.remove(['jwtToken', 'tokenType', 'userEmail']);
-      // 사용자에게 재로그인 안내 (진행률은 유지)
-      await chrome.storage.local.set({ 
-        analysisStatus: "error",
-        analysisMessage: "로그인이 만료되었습니다. 다시 로그인해주세요."
-      });
-      return; // 재시도하지 않고 종료
-    }
-    
-    // 재시도 가능한 오류인지 확인 (DB 연결 오류도 포함)
-    const isRetryableError = errorMessage.includes('Event loop') || 
-                           errorMessage.includes('RuntimeError') || 
-                           errorMessage.includes('작업 처리 실패') ||
-                           errorMessage.includes('TimeoutError') ||
-                           errorMessage.includes('Database') ||
-                           errorMessage.includes('connection') ||
-                           errorMessage.includes('500');
-    
-    if (isRetryableError && retryCount < maxRetries) {
-      console.log(`백그라운드: 재시도 가능한 오류, ${2 + retryCount}초 후 재시도 (${retryCount + 1}/${maxRetries})`);
-      
-      // 현재 진행률과 메시지 보존 (재시도는 백그라운드에서 조용히)
-      const { analysisProgress: currentProgress, analysisMessage: currentMessage } = await chrome.storage.local.get(['analysisProgress', 'analysisMessage']);
-      await chrome.storage.local.set({ 
-        analysisStatus: "analyzing",
-        // 메시지는 그대로 유지 (재시도 표시 안함)
-        analysisMessage: currentMessage || "영상 속 장소를 추출하고 있습니다...",
-        // 진행률은 현재 값 유지 (45%면 45%에서 멈춤)
-        analysisProgress: currentProgress || 0
-      });
-      
-      // 지연 후 재시도 (DB 연결 문제를 위해 더 긴 대기시간)
-      const retryDelay = errorMessage.includes('TimeoutError') || errorMessage.includes('Database') 
-        ? (5 + retryCount * 5) * 1000  // DB 오류: 5초, 10초, 15초
-        : (2 + retryCount) * 1000;     // 기타 오류: 2초, 3초, 4초
-      
-      setTimeout(() => {
-        processAndShowMapInBackground(youtubeUrl, jwtToken, tokenType, retryCount + 1);
-      }, retryDelay);
-      
-      return; // 현재 함수 종료, setTimeout으로 재시도
-    }
-    
-    // 최종 실패 또는 재시도 불가능한 오류 (진행률은 유지)
-    console.error("백그라운드: 최종 분석 실패 또는 재시도 불가능한 오류");
-    const { analysisProgress: currentProgress } = await chrome.storage.local.get('analysisProgress');
-    await chrome.storage.local.set({ 
-      analysisStatus: "error",
-      analysisMessage: retryCount >= maxRetries ? 
-        "잠시 후 다시 시도해주세요." : 
-        errorMessage,
-      // 진행률은 현재 값 유지
-      analysisProgress: currentProgress || 0
-    });
-  } finally {
-    // 작업 소요 시간을 측정하여 저장
-    const endTime = Date.now();
-    const duration = endTime - startTime;
-    await chrome.storage.local.set({ lastRequestDuration: duration });
-    console.log(`백그라운드 분석 소요 시간: ${duration}ms`);
-  }
-}
-
-// Job 폴링 함수
-async function pollForJobCompletion(jobId: string): Promise<any> {
-  const pollInterval = 1000; // 1초마다 체크
-  let retryCount = 0;
-  
-  while (true) {
-    try {
-      console.log(`백그라운드: Job 상태 확인 - ${jobId}`);
-      
-      const statusResponse = await fetch(`${API_BASE_URL}/api/v1/jobs/${jobId}/status`);
-      
-      if (!statusResponse.ok) {
-        throw new Error(`HTTP ${statusResponse.status}: ${statusResponse.statusText}`);
-      }
-      
-      const statusData = await statusResponse.json();
-      
-      console.log(`백그라운드: Job 상태 - ${statusData.status}, 진행률: ${statusData.progress}%`);
-      
-      // 서버 메시지를 사용자 친화적인 메시지로 변환
-      const friendlyMessage = getFriendlyMessage(statusData.current_step, statusData.progress);
-      
-      // popup.tsx로 실시간 진행률과 메시지 전송
-      if (statusUpdatePort) {
-        statusUpdatePort.postMessage({
-          type: "progress_update",
-          progress: statusData.progress,
-          message: friendlyMessage
-        });
-      }
-      
-      // Chrome storage에 진행률 저장 (백그라운드 분석에서 사용)
-      await chrome.storage.local.set({ 
-        analysisProgress: statusData.progress,
-        analysisMessage: friendlyMessage
-      });
-      
-      if (statusData.status === 'SUCCESS') {
-        const resultResponse = await fetch(`${API_BASE_URL}/api/v1/jobs/${jobId}/result`);
-        
-        if (!resultResponse.ok) {
-          throw new Error(`결과 조회 실패 - HTTP ${resultResponse.status}: ${resultResponse.statusText}`);
-        }
-        
-        const resultData = await resultResponse.json();
-        console.log("백그라운드: Job 완료, 결과 수신");
-        return {
-          places: resultData.places || [],
-          video_title: resultData.video_title,
-          video_thumbnail: resultData.video_thumbnail
-        };
-      } else if (statusData.status === 'FAILURE') {
-        // 에러 상세 정보 가져오기
-        try {
-          const resultResponse = await fetch(`${API_BASE_URL}/api/v1/jobs/${jobId}/result`);
-          const resultData = await resultResponse.json();
-          const errorMessage = resultData.error_message || statusData.current_step || '알 수 없는 오류';
-          throw new Error(`작업 처리 실패: ${errorMessage}`);
-        } catch (resultError) {
-          throw new Error(`작업 처리 실패: ${statusData.current_step || '알 수 없는 오류'}`);
-        }
-      }
-
-      // 아직 처리 중이면 잠시 대기 후 다시 확인
-      await new Promise(resolve => setTimeout(resolve, pollInterval));
-    } catch (error) {
-      console.error('백그라운드: Job 폴링 중 오류:', error);
-      
-      // 작업 실패 메시지인 경우 즉시 오류 throw
-      if (error instanceof Error && error.message.includes('작업 처리 실패')) {
-        throw error;
-      }
-      
-      // 500 서버 오류나 특정 오류 코드인 경우 재시도 제한
-      if (error instanceof Error && (
-        error.message.includes('500') || 
-        error.message.includes('Event loop') ||
-        error.message.includes('RuntimeError')
-      )) {
-        retryCount = (retryCount || 0) + 1;
-        if (retryCount > 2) { // 폴링에서는 2회만 재시도
-          console.error('백그라운드: Job 폴링 재시도 횟수 초과');
-          throw new Error('작업 처리 실패');
-        }
-        console.log(`백그라운드: 서버 오류로 인한 폴링 재시도 ${retryCount}/2`);
-        await new Promise(resolve => setTimeout(resolve, pollInterval * 2)); // 대기 시간 단축
-        continue;
-      }
-      
-      // 일반적인 네트워크 오류는 좀 더 오래 기다린 후 재시도
-      console.log('백그라운드: 폴링 중 네트워크 오류, 재시도...', error);
-      await new Promise(resolve => setTimeout(resolve, pollInterval * 2));
-    }
-  }
-}
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "handleIconClick") {
@@ -372,12 +183,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         
         // 잠시 후 분석 시작
         setTimeout(() => {
-          console.log("백그라운드: setTimeout 실행됨 - processAndShowMapInBackground 호출", { 
+          console.log("백그라운드: setTimeout 실행됨 - processAndShowMap 호출", { 
             url: message.url, 
             hasToken: !!jwtToken, 
+            jwtTokenLength: jwtToken?.length,
             tokenType 
           });
-          processAndShowMapInBackground(message.url, jwtToken, tokenType);
+          processAndShowMap(message.url, jwtToken, tokenType);
         }, 500);
         
         sendResponse({ status: "analysis_started" });
@@ -392,21 +204,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.type === "startProcessing") {
     console.log(`백그라운드: ${message.type} 이벤트 수신. 바로 처리 시작.`);
     (async () => {
-      const { jwtToken, tokenType } = await chrome.storage.local.get(['jwtToken', 'tokenType']);
+      // popup에서 전달된 토큰을 우선 사용, 없으면 storage에서 가져오기
+      let jwtToken = message.jwtToken;
+      let tokenType = message.tokenType;
+      
+      if (!jwtToken || !tokenType) {
+        const stored = await chrome.storage.local.get(['jwtToken', 'tokenType']);
+        jwtToken = stored.jwtToken;
+        tokenType = stored.tokenType;
+      }
+      
+      console.log('[PIND_DEBUG] startProcessing with tokens:', {
+        fromMessage: { hasToken: !!message.jwtToken, hasType: !!message.tokenType },
+        finalTokens: { hasJwtToken: !!jwtToken, jwtTokenLength: jwtToken?.length, tokenType: tokenType }
+      });
+      
       processAndShowMap(message.url, jwtToken, tokenType);
       sendResponse({ status: "processing_started" });
-    })();
-    return true;
-  } else if (message.type === "startBackgroundAnalysis") {
-    console.log(`백그라운드: ${message.type} 이벤트 수신. 팝업에서 요청한 백그라운드 분석 시작.`);
-    (async () => {
-      console.log("백그라운드: 팝업 요청으로 분석 시작", { 
-        url: message.url, 
-        hasToken: !!message.jwtToken, 
-        tokenType: message.tokenType 
-      });
-      processAndShowMapInBackground(message.url, message.jwtToken, message.tokenType);
-      sendResponse({ status: "background_analysis_started" });
     })();
     return true;
   }
@@ -477,7 +291,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
                 // 잠시 후 분석 시작
                 setTimeout(() => {
                   console.log("백그라운드: setTimeout 실행됨 - 분석 함수 호출 시작");
-                  processAndShowMapInBackground(pendingUrl, jwtToken, tokenType);
+                  processAndShowMap(pendingUrl, jwtToken, tokenType);
                 }, 500);
                 console.log("백그라운드: setTimeout 설정 완료");
               } else {

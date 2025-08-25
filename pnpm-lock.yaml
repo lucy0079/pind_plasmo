@@ -11,6 +11,9 @@ importers:
       change-case:
         specifier: ^5.4.4
         version: 5.4.4
+      gsap:
+        specifier: ^3.13.0
+        version: 3.13.0
       plasmo:
         specifier: 0.90.5
         version: 0.90.5(@swc/core@1.13.2(@swc/helpers@0.5.17))(@swc/helpers@0.5.17)(@types/node@20.11.5)(postcss@8.5.6)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -2023,6 +2026,9 @@ packages:
   graphql@15.10.1:
     resolution: {integrity: sha512-BL/Xd/T9baO6NFzoMpiMD7YUZ62R6viR5tp/MULVEnbYJXZA//kRNW7J0j1w/wXArgL0sCxhDfK5dczSKn3+cg==}
     engines: {node: '>= 10.x'}
+
+  gsap@3.13.0:
+    resolution: {integrity: sha512-QL7MJ2WMjm1PHWsoFrAQH/J8wUeqZvMtHO58qdekHpCfhvhSL4gSiz6vJf5EeMP0LOn3ZCprL2ki/gjED8ghVw==}
 
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
@@ -5338,6 +5344,8 @@ snapshots:
       graphql: 15.10.1
 
   graphql@15.10.1: {}
+
+  gsap@3.13.0: {}
 
   has-flag@4.0.0: {}
 

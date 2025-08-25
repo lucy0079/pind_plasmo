@@ -27,7 +27,7 @@ export const getStyle = () => {
       transition: width 0.1s ease, height 0.1s ease;
     }
 
-    /* YouTube 플레이어가 작아지는 분기점 기준 */
+    /* Responsive breakpoint for YouTube player */
     @media (max-width: 580px) {
       :host {
         width: 36px !important;
@@ -57,17 +57,17 @@ const YouTubeButton = () => {
   const [isLoggedIn, setIsLoggedIn] = React.useState(false);
 
   React.useEffect(() => {
-    // 초기 로그인 상태 확인
+    // Check initial login status
     const checkLoginStatus = async () => {
       const { jwtToken } = await chrome.storage.local.get('jwtToken');
       setIsLoggedIn(!!jwtToken);
     };
     checkLoginStatus();
 
-    // 백그라운드에서 로그인 성공 메시지 수신
+    // Listen for login success message from background
     const messageListener = (message: any) => {
       if (message.type === "loginSuccess") {
-        console.log("콘텐츠 스크립트: 로그인 성공 메시지 수신");
+        console.log("Content script: Login success message received");
         setIsLoggedIn(true);
       }
     };
@@ -80,9 +80,9 @@ const YouTubeButton = () => {
   }, []);
 
   const handleButtonClick = async () => {
-    console.log("콘텐츠 스크립트: 아이콘 클릭. 팝업 열기.");
+    console.log("Content script: Icon clicked. Opening popup.");
     
-    // 로그인 상태에 관계없이 항상 팝업 열기
+    // Always open popup regardless of login status
     chrome.runtime.sendMessage({
       type: "handleIconClick",
       url: window.location.href
@@ -92,7 +92,7 @@ const YouTubeButton = () => {
   return (
     <div
       className="pind-button-container"
-      title="영상 속 장소 찾기"
+      title="Find locations in video"
       onClick={handleButtonClick}>
       <img
         src={locationIconUrl}

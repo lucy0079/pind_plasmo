@@ -12,35 +12,30 @@ function IndexPopup() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
-  const [percentage, setPercentage] = useState(0);
   const [analysisComplete, setAnalysisComplete] = useState(false);
   const [analysisResultUrl, setAnalysisResultUrl] = useState<string | null>(null);
   const [backgroundAnalyzing, setBackgroundAnalyzing] = useState(false);
   const [backgroundAnalysisMessage, setBackgroundAnalysisMessage] = useState("");
-  const [backgroundProgress, setBackgroundProgress] = useState(0);
 
   const startProcessingPendingUrl = async (pendingUrl: string) => {
     setLoading(true);
-    setLoadingMessage("요청 준비 중...");
-    setPercentage(0);
+    setLoadingMessage("Preparing request...");
 
     const { jwtToken, tokenType } = await chrome.storage.local.get(['jwtToken', 'tokenType']);
     const port = chrome.runtime.connect({ name: "loading-status" });
 
     port.onMessage.addListener((msg) => {
       if (msg.type === "progress_update") {
-        setPercentage(msg.progress);
         setLoadingMessage(msg.message);
       } else if (msg.status === "complete") {
-        setPercentage(100);
         setTimeout(async () => {
           setLoading(false);
-          // 분석 결과 URL 가져오기
+          // Get analysis result URL
           const { analysisResult } = await chrome.storage.local.get('analysisResult');
           if (analysisResult) {
             setAnalysisResultUrl(analysisResult);
             setAnalysisComplete(true);
-            // 분석 결과를 사용한 후 삭제
+            // Remove analysis result after use
             await chrome.storage.local.remove('analysisResult');
           }
         }, 500);
@@ -75,28 +70,27 @@ function IndexPopup() {
       const { jwtToken, tokenType, analysisStatus, analysisMessage, analysisResult } = await chrome.storage.local.get(['jwtToken', 'tokenType', 'analysisStatus', 'analysisMessage', 'analysisResult']);
       setIsLoggedIn(!!jwtToken);
 
-      // 로그인된 사용자이고 진행 중인 분석이 없다면 자동 분석 시작
+      // Start auto analysis if user is logged in and no analysis is in progress
       if (jwtToken && tokenType && analysisStatus !== "analyzing" && !analysisResult) {
-        // 현재 탭의 URL 가져오기
+        // Get current tab URL
         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
         const currentUrl = tabs[0]?.url;
         
         if (currentUrl && currentUrl.includes("youtube.com/watch?v=")) {
-          console.log("팝업: 로그인된 사용자 - 자동 분석 시작", { currentUrl });
+          console.log("Popup: Logged in user - starting auto analysis", { currentUrl });
           
-          // 분석 상태 설정
+          // Set analysis status
           await chrome.storage.local.set({ 
             analysisStatus: "analyzing",
-            analysisMessage: "영상 속 장소를 추출하고 있습니다..."
+            analysisMessage: "Extracting locations from video..."
           });
           
           setBackgroundAnalyzing(true);
-          setBackgroundAnalysisMessage("영상 속 장소를 추출하고 있습니다...");
-          setBackgroundProgress(0);
+          setBackgroundAnalysisMessage("Extracting locations from video...");
           
-          // background script에 분석 요청
+          // Request analysis from background script
           chrome.runtime.sendMessage({
-            type: "startBackgroundAnalysis",
+            type: "startProcessing",
             url: currentUrl,
             jwtToken: jwtToken,
             tokenType: tokenType
@@ -104,40 +98,33 @@ function IndexPopup() {
         }
       }
 
-      // 백그라운드 분석 상태 확인
+      // Check background analysis status
       if (analysisStatus === "analyzing") {
         setBackgroundAnalyzing(true);
-        setBackgroundAnalysisMessage(analysisMessage || "분석 중...");
-        setBackgroundProgress(0);
+        setBackgroundAnalysisMessage(analysisMessage || "Analyzing...");
         setAnalysisComplete(false);
         setAnalysisResultUrl(null);
       } else if (analysisStatus === "completed" && analysisResult) {
-        // 분석 완료 상태
+        // Analysis completed status
         setBackgroundAnalyzing(false);
         setAnalysisComplete(true);
         setAnalysisResultUrl(analysisResult);
-        setBackgroundAnalysisMessage(analysisMessage || "분석 완료!");
-        // 분석 상태 초기화 (다음 분석을 위해)
+        setBackgroundAnalysisMessage(analysisMessage || "Analysis complete!");
+        // Reset analysis status (for next analysis)
         await chrome.storage.local.remove(['analysisStatus', 'analysisMessage']);
       } else if (analysisStatus === "error") {
-        const { analysisProgress } = await chrome.storage.local.get('analysisProgress');
         setBackgroundAnalyzing(false);
         setAnalysisComplete(false);
         
-        // 진행률 유지 (오류 발생 시에도 현재 진행률에서 멈춤)
-        if (typeof analysisProgress === 'number') {
-          setBackgroundProgress(analysisProgress);
-        }
-        
-        // 더 친화적인 오류 메시지 표시
-        const friendlyMessage = analysisMessage?.includes('서버에서 일시적인 문제') 
+        // Display more user-friendly error message
+        const friendlyMessage = analysisMessage?.includes('temporary server issue') 
           ? analysisMessage 
-          : "분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+          : "An error occurred during analysis. Please try again later.";
         setMessage(friendlyMessage);
-        // 에러 상태 초기화
+        // Reset error status
         await chrome.storage.local.remove(['analysisStatus', 'analysisMessage']);
       } else {
-        // 일반적인 상태: 이전 분석 상태 초기화
+        // Normal state: reset previous analysis status
         setBackgroundAnalyzing(false);
         setAnalysisComplete(false);
         setAnalysisResultUrl(null);
@@ -153,64 +140,49 @@ function IndexPopup() {
         setIsLoggedIn(!!changes.jwtToken.newValue);
       }
       
-      // 분석 상태 변경 감지
+      // Detect analysis status changes
       if (changes.analysisStatus) {
         const status = changes.analysisStatus.newValue;
         if (status === "analyzing") {
           const { analysisMessage } = await chrome.storage.local.get('analysisMessage');
           setBackgroundAnalyzing(true);
-          setBackgroundAnalysisMessage(analysisMessage || "분석 중...");
-          setBackgroundProgress(0);
+          setBackgroundAnalysisMessage(analysisMessage || "Analyzing...");
           setAnalysisComplete(false);
         } else if (status === "completed") {
           const { analysisResult, analysisMessage } = await chrome.storage.local.get(['analysisResult', 'analysisMessage']);
           setBackgroundAnalyzing(false);
           setAnalysisComplete(true);
           setAnalysisResultUrl(analysisResult);
-          setBackgroundAnalysisMessage(analysisMessage || "분석 완료!");
+          setBackgroundAnalysisMessage(analysisMessage || "Analysis complete!");
         } else if (status === "error") {
-          const { analysisMessage, analysisProgress } = await chrome.storage.local.get(['analysisMessage', 'analysisProgress']);
+          const { analysisMessage } = await chrome.storage.local.get('analysisMessage');
           setBackgroundAnalyzing(false);
           setAnalysisComplete(false);
           
-          // 진행률 유지 (오류 발생 시에도 현재 진행률에서 멈춤)
-          if (typeof analysisProgress === 'number') {
-            setBackgroundProgress(analysisProgress);
-          }
-          
-          // 더 친화적인 오류 메시지 표시
-          const friendlyMessage = analysisMessage?.includes('서버에서 일시적인 문제') 
+          // Display more user-friendly error message
+          const friendlyMessage = analysisMessage?.includes('temporary server issue') 
             ? analysisMessage 
-            : "분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+            : "An error occurred during analysis. Please try again later.";
           setMessage(friendlyMessage);
         }
       }
       
-      // 백그라운드 분석 진행률 업데이트 감지
-      if (changes.analysisProgress) {
-        const progress = changes.analysisProgress.newValue;
-        if (typeof progress === 'number') {
-          setBackgroundProgress(progress);
-        }
-      }
-      
-      // 백그라운드 분석 메시지 업데이트 감지
+      // Detect background analysis message updates
       if (changes.analysisMessage && backgroundAnalyzing) {
         setBackgroundAnalysisMessage(changes.analysisMessage.newValue || "분석 중...");
       }
       
-      // 분석 결과 생성 감지 (analysisResult가 새로 생성되고 analysisStatus가 삭제되면 완료)
+      // Detect analysis result generation (complete when analysisResult is created and analysisStatus is deleted)
       if (changes.analysisResult && changes.analysisResult.newValue) {
-        console.log("팝업: 분석 결과 감지됨", changes.analysisResult.newValue);
-        // analysisStatus가 없으면 분석 완료로 간주
+        console.log("Popup: Analysis result detected", changes.analysisResult.newValue);
+        // Consider analysis complete if analysisStatus is absent
         const { analysisStatus } = await chrome.storage.local.get('analysisStatus');
         if (!analysisStatus) {
-          console.log("팝업: 분석 완료 상태로 전환");
+          console.log("Popup: Switching to analysis complete status");
           setBackgroundAnalyzing(false);
           setAnalysisComplete(true);
           setAnalysisResultUrl(changes.analysisResult.newValue);
           setBackgroundAnalysisMessage("분석 완료!");
-          setBackgroundProgress(100);
         }
       }
     };
@@ -228,7 +200,7 @@ function IndexPopup() {
     const youtubeUrl = pendingUrl || url;
     
     if (youtubeUrl && jwtToken && tokenType) {
-      // JWT 토큰과 YouTube URL을 함께 웹 맵으로 전달
+      // Pass JWT token and YouTube URL together to web map
       const webMapUrl = `http://localhost:3000/dashboard?url=${encodeURIComponent(youtubeUrl)}&token=${encodeURIComponent(jwtToken)}&token_type=${encodeURIComponent(tokenType)}&user_email=${encodeURIComponent(userEmail || '')}`;
       
       chrome.tabs.create({ url: webMapUrl });
@@ -237,7 +209,7 @@ function IndexPopup() {
   };
 
   const handleLoginClick = () => {
-    // 현재 YouTube URL을 로그인 URL에 포함
+    // Include current YouTube URL in login URL
     const returnUrl = encodeURIComponent(url || "")
     const loginUrlWithReturn = `${LOGIN_URL}&return_url=${returnUrl}`
     chrome.tabs.create({ url: loginUrlWithReturn });
@@ -246,40 +218,44 @@ function IndexPopup() {
 
   const handleViewMapClick = () => {
     if (analysisResultUrl) {
+      console.log("Opening map with URL:", analysisResultUrl);
       chrome.tabs.create({ url: analysisResultUrl });
       window.close();
+    } else {
+      console.error("No analysis result URL available");
+      setMessage("No map data available. Please try analyzing the video again.");
     }
   };
 
   return (
     <div className="popup-container">
-      {(loading || backgroundAnalyzing) && <LoadingIndicator message={loading ? loadingMessage : backgroundAnalysisMessage} percentage={loading ? percentage : backgroundProgress} />}
+      {(loading || backgroundAnalyzing) && <LoadingIndicator message={loading ? loadingMessage : backgroundAnalysisMessage} />}
       <h1>Pind</h1>
-      <p className="url-text">현재 URL: {url || "로딩 중..."}</p>
+      <p className="url-text">Current URL: {url || "Loading..."}</p>
 
       {isYoutubeVideo ? (
         backgroundAnalyzing ? (
           <div>
             <p className="status-message">{backgroundAnalysisMessage}</p>
-            <button disabled>분석 중...</button>
+            <button disabled>Analyzing...</button>
           </div>
         ) : analysisComplete ? (
           <button onClick={handleViewMapClick}>
-            영상 속 장소 지도 보기
+            View Location Map
           </button>
         ) : isLoggedIn ? (
           <div>
-            <p className="status-message">분석을 시작합니다...</p>
-            <button disabled>준비 중...</button>
+            <p className="status-message">Starting analysis...</p>
+            <button disabled>Preparing...</button>
           </div>
         ) : (
           <button onClick={handleLoginClick} disabled={loading}>
-            로그인 하러 이동
+            Go to Login
           </button>
         )
       ) : (
         <p className="warning-message">
-          이 페이지는 유튜브 영상 페이지가 아닙니다.
+          This page is not a YouTube video page.
         </p>
       )}
 
