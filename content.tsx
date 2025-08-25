@@ -27,7 +27,7 @@ export const getStyle = () => {
       transition: width 0.1s ease, height 0.1s ease;
     }
 
-    /* YouTube 플레이어가 작아지는 분기점 기준 */
+    /* Responsive breakpoint for YouTube player */
     @media (max-width: 580px) {
       :host {
         width: 36px !important;
@@ -54,8 +54,35 @@ export const getInlineAnchor: PlasmoGetInlineAnchor = () =>
 export const getShadowHostId = () => "pind-youtube-button"
 
 const YouTubeButton = () => {
-  const handleButtonClick = () => {
-    console.log("콘텐츠 스크립트: 아이콘 클릭. 백그라운드에 팝업 요청.");
+  const [isLoggedIn, setIsLoggedIn] = React.useState(false);
+
+  React.useEffect(() => {
+    // Check initial login status
+    const checkLoginStatus = async () => {
+      const { jwtToken } = await chrome.storage.local.get('jwtToken');
+      setIsLoggedIn(!!jwtToken);
+    };
+    checkLoginStatus();
+
+    // Listen for login success message from background
+    const messageListener = (message: any) => {
+      if (message.type === "loginSuccess") {
+        console.log("Content script: Login success message received");
+        setIsLoggedIn(true);
+      }
+    };
+
+    chrome.runtime.onMessage.addListener(messageListener);
+
+    return () => {
+      chrome.runtime.onMessage.removeListener(messageListener);
+    };
+  }, []);
+
+  const handleButtonClick = async () => {
+    console.log("Content script: Icon clicked. Opening popup.");
+    
+    // Always open popup regardless of login status
     chrome.runtime.sendMessage({
       type: "handleIconClick",
       url: window.location.href
@@ -65,7 +92,7 @@ const YouTubeButton = () => {
   return (
     <div
       className="pind-button-container"
-      title="영상 속 장소 찾기"
+      title="Find locations in video"
       onClick={handleButtonClick}>
       <img
         src={locationIconUrl}
