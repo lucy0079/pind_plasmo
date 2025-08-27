@@ -3,15 +3,15 @@ let statusUpdatePort: chrome.runtime.Port | null = null;
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === "loading-status") {
     statusUpdatePort = port;
-    console.log("백그라운드: popup과 포트 연결 성공.");
+    console.log("Background: Port connection with popup successful.");
 
     port.onMessage.addListener(async (message) => {
       if (message.type === "showMap") {
-        console.log(`백그라운드: 포트를 통해 ${message.type} 이벤트 수신.`);
+        console.log(`Background: Received ${message.type} event through port.`);
         
-        // 저장된 이전 작업 시간을 불러와 popup에 전달
+        // Load saved previous task duration and send to popup
         const result = await chrome.storage.local.get("lastRequestDuration");
-        const estimatedDuration = result.lastRequestDuration || 8000; // 기본값 8초
+        const estimatedDuration = result.lastRequestDuration || 8000; // Default 8 seconds
         port.postMessage({ status: "starting", estimatedDuration });
 
         processAndShowMap(message.url, message.jwtToken, message.tokenType);
@@ -20,7 +20,7 @@ chrome.runtime.onConnect.addListener((port) => {
 
     port.onDisconnect.addListener(() => {
       statusUpdatePort = null;
-      console.log("백그라운드: popup과 포트 연결 끊김.");
+      console.log("Background: Port connection with popup disconnected.");
     });
   }
 });
@@ -28,26 +28,26 @@ chrome.runtime.onConnect.addListener((port) => {
 const API_BASE_URL = "http://localhost:8000";
 const WEB_MAP_BASE_URL = "http://localhost:3000";
 
-// 서버의 기술적인 메시지를 사용자 친화적인 메시지로 변환
+// Convert technical server messages to user-friendly messages
 function getFriendlyMessage(serverMessage: string, progress: number): string {
   if (!serverMessage) {
-    return "영상을 분석하고 있습니다...";
+    return "analyzing...";
   }
   
   const message = serverMessage.toLowerCase();
   
-  // 진행률에 따른 기본 메시지
-  if (progress < 20) {
-    return "영상 정보를 확인하고 있습니다...";
-  } else if (progress < 40) {
-    return "영상 내용을 분석하고 있습니다...";
-  } else if (progress < 70) {
-    return "장소 정보를 찾고 있습니다...";
-  } else if (progress < 90) {
-    return "지도에 마커 표시 중...";
-  } else {
-    return "분석을 완료하고 있습니다...";
-  }
+  // // Default messages based on progress
+  // if (progress < 20) {
+  //   return "Checking video information...";
+  // } else if (progress < 40) {
+  //   return "Analyzing video content...";
+  // } else if (progress < 70) {
+  //   return "Finding location information...";
+  // } else if (progress < 90) {
+  //   return "Adding markers to map...";
+  // } else {
+  //   return "Completing analysis...";
+  // }
 }
 
 async function processAndShowMap(youtubeUrl: string, jwtToken: string, tokenType: string) {
@@ -78,14 +78,14 @@ async function processAndShowMap(youtubeUrl: string, jwtToken: string, tokenType
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.detail || `백엔드 서버 오류: ${response.statusText}`);
+      throw new Error(data.detail || `Backend server error: ${response.statusText}`);
     }
 
     statusUpdatePort?.postMessage({ status: "mapping" });
 
     const locations = data;
     const locationsData = JSON.stringify(locations);
-    // 로그인된 사용자는 dashboard로 이동
+    // Logged-in users go to dashboard
     let finalUrl = `${WEB_MAP_BASE_URL}/dashboard?locations=${encodeURIComponent(locationsData)}`;
 
     const storedData = await chrome.storage.local.get('userEmail');
@@ -116,7 +116,7 @@ async function processAndShowMap(youtubeUrl: string, jwtToken: string, tokenType
       userEmail: userEmail
     });
 
-    // 분석 결과를 저장하고 팝업에 알림 (바로 웹 맵 열지 않음)
+    // Save analysis results and notify popup (don't open web map immediately)
     await chrome.storage.local.set({ 
       analysisResult: finalUrl,
       analysisStatus: "completed",
@@ -125,10 +125,10 @@ async function processAndShowMap(youtubeUrl: string, jwtToken: string, tokenType
     statusUpdatePort?.postMessage({ status: "complete" });
 
   } catch (error) {
-    console.error("백그라운드 처리 중 오류 발생:", error);
-    const errorMessage = error instanceof Error ? error.message : "장소 추출 중 오류가 발생했습니다.";
+    console.error("Error occurred during background processing:", error);
+    const errorMessage = error instanceof Error ? error.message : "An error occurred during location extraction.";
     
-    // Storage에 오류 상태 저장
+    // Save error state to storage
     await chrome.storage.local.set({ 
       analysisStatus: "error",
       analysisMessage: "An error occurred during analysis. Please try again later."
@@ -138,52 +138,52 @@ async function processAndShowMap(youtubeUrl: string, jwtToken: string, tokenType
     chrome.notifications.create({
       type: "basic",
       iconUrl: chrome.runtime.getURL("assets/icon.png"),
-      title: "Pind 처리 오류",
+      title: "Pind Processing Error",
       message: errorMessage
     });
   } finally {
-    // 작업 소요 시간을 측정하여 저장
+    // Measure and save task duration
     const endTime = Date.now();
     const duration = endTime - startTime;
     await chrome.storage.local.set({ lastRequestDuration: duration });
-    console.log(`이번 작업 소요 시간: ${duration}ms`);
+    console.log(`This task duration: ${duration}ms`);
   }
 }
 
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "handleIconClick") {
-    console.log(`백그라운드: ${message.type} 이벤트 수신. URL 저장 후 팝업 실행.`);
+    console.log(`Background: Received ${message.type} event. Saving URL and opening popup.`);
     (async () => {
       const dataToStore = { 
         pendingUrl: message.url,
         youtubeTabId: sender.tab?.id 
       };
-      console.log("백그라운드: 세션에 저장할 데이터", dataToStore);
+      console.log("Background: Data to store in session", dataToStore);
       await chrome.storage.session.set(dataToStore);
-      console.log("백그라운드: 세션 저장 완료");
+      console.log("Background: Session storage complete");
       
-      // 로그인 상태 확인
+      // Check login status
       const { jwtToken, tokenType } = await chrome.storage.local.get(['jwtToken', 'tokenType']);
       
-      console.log("백그라운드: 토큰 상태 확인", { hasJwtToken: !!jwtToken, hasTokenType: !!tokenType });
+      console.log("Background: Token status check", { hasJwtToken: !!jwtToken, hasTokenType: !!tokenType });
       
       if (jwtToken && tokenType) {
-        // 로그인된 사용자: 자동으로 분석 시작
-        console.log("백그라운드: 로그인된 사용자 - 자동 분석 시작", { url: message.url });
+        // Logged-in user: Start analysis automatically
+        console.log("Background: Logged-in user - Starting automatic analysis", { url: message.url });
         
-        // 분석 상태를 storage에 저장
+        // Save analysis status to storage
         await chrome.storage.local.set({ 
           analysisStatus: "analyzing",
-          analysisMessage: "영상 속 장소를 추출하고 있습니다..."
+          analysisMessage: "analyzing..."
         });
         
-        // 팝업 열기
+        // Open popup
         chrome.action.openPopup();
         
-        // 잠시 후 분석 시작
+        // Start analysis after a short delay
         setTimeout(() => {
-          console.log("백그라운드: setTimeout 실행됨 - processAndShowMap 호출", { 
+          console.log("Background: setTimeout executed - calling processAndShowMap", { 
             url: message.url, 
             hasToken: !!jwtToken, 
             jwtTokenLength: jwtToken?.length,
@@ -194,17 +194,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         
         sendResponse({ status: "analysis_started" });
       } else {
-        // 비로그인 사용자: 팝업만 열기
-        console.log("백그라운드: 비로그인 사용자 - 팝업만 열기");
+        // Non-logged-in user: Just open popup
+        console.log("Background: Non-logged-in user - Opening popup only");
         chrome.action.openPopup();
         sendResponse({ status: "popup_opened" });
       }
     })();
     return true;
   } else if (message.type === "startProcessing") {
-    console.log(`백그라운드: ${message.type} 이벤트 수신. 바로 처리 시작.`);
+    console.log(`Background: Received ${message.type} event. Starting processing immediately.`);
     (async () => {
-      // popup에서 전달된 토큰을 우선 사용, 없으면 storage에서 가져오기
+      // Use tokens passed from popup first, otherwise get from storage
       let jwtToken = message.jwtToken;
       let tokenType = message.tokenType;
       
@@ -229,10 +229,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 const AUTH_CALLBACK_URL = "http://localhost:3000/auth/callback";
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  console.log(`백그라운드: 탭 업데이트 감지 - tabId: ${tabId}, status: ${changeInfo.status}, url: ${tab.url}`);
+  console.log(`Background: Tab update detected - tabId: ${tabId}, status: ${changeInfo.status}, url: ${tab.url}`);
   
   if (changeInfo.status === 'complete' && tab.url?.startsWith(AUTH_CALLBACK_URL)) {
-    console.log("백그라운드: 콜백 URL 감지됨!", tab.url);
+    console.log("Background: Callback URL detected!", tab.url);
     try {
       const url = new URL(tab.url);
       const params = new URLSearchParams(url.search);
@@ -240,7 +240,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       const tokenType = params.get('token_type');
       const userEmail = params.get('user_email'); // Assuming email is also passed
 
-      console.log("백그라운드: 토큰 파라미터 파싱 결과", { jwtToken: !!jwtToken, tokenType, userEmail });
+      console.log("Background: Token parameter parsing result", { jwtToken: !!jwtToken, tokenType, userEmail });
 
       if (jwtToken && tokenType) {
         await chrome.storage.local.set({
@@ -248,14 +248,14 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
           tokenType: tokenType,
           userEmail: userEmail || '' // Save email if provided
         });
-        console.log("백그라운드: 토큰 저장 성공!");
+        console.log("Background: Token storage successful!");
 
         // Close the login tab
         chrome.tabs.remove(tabId);
 
         // Get stored YouTube tab ID and return to it
         const { youtubeTabId, pendingUrl } = await chrome.storage.session.get(['youtubeTabId', 'pendingUrl']);
-        console.log("백그라운드: 저장된 데이터 확인", { youtubeTabId, pendingUrl: !!pendingUrl });
+        console.log("Background: Checking stored data", { youtubeTabId, pendingUrl: !!pendingUrl });
         
         if (youtubeTabId) {
           try {
@@ -273,54 +273,54 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
                 tokenType: tokenType
               });
 
-              // 로그인 성공 후 자동으로 분석 시작
+              // Start analysis automatically after successful login
               if (pendingUrl) {
-                console.log("백그라운드: 로그인 성공 후 자동 분석 시작", { pendingUrl, jwtToken: !!jwtToken, tokenType });
+                console.log("Background: Starting automatic analysis after successful login", { pendingUrl, jwtToken: !!jwtToken, tokenType });
                 
-                // 분석 상태를 storage에 저장
+                // Save analysis status to storage
                 await chrome.storage.local.set({ 
                   analysisStatus: "analyzing",
-                  analysisMessage: "영상 속 장소를 추출하고 있습니다..."
+                  analysisMessage: "analyzing..."
                 });
-                console.log("백그라운드: 분석 상태 저장 완료");
+                console.log("Background: Analysis status storage complete");
                 
-                // 팝업을 열어서 로딩 UI 표시
+                // Open popup to show loading UI
                 chrome.action.openPopup();
-                console.log("백그라운드: 팝업 열기 요청 완료");
+                console.log("Background: Popup open request complete");
                 
-                // 잠시 후 분석 시작
+                // Start analysis after a short delay
                 setTimeout(() => {
-                  console.log("백그라운드: setTimeout 실행됨 - 분석 함수 호출 시작");
+                  console.log("Background: setTimeout executed - starting analysis function call");
                   processAndShowMap(pendingUrl, jwtToken, tokenType);
                 }, 500);
-                console.log("백그라운드: setTimeout 설정 완료");
+                console.log("Background: setTimeout setup complete");
               } else {
-                console.log("백그라운드: pendingUrl이 없음 - 자동 분석 건너뜀");
+                console.log("Background: No pendingUrl - skipping automatic analysis");
               }
             }
           } catch (error) {
-            console.log("백그라운드: YouTube 탭이 더 이상 존재하지 않습니다.", error);
+            console.log("Background: YouTube tab no longer exists.", error);
           }
         } else {
-          console.log("백그라운드: youtubeTabId가 없습니다.");
+          console.log("Background: No youtubeTabId found.");
         }
 
         // Optional: Notify the user of success
         chrome.notifications.create({
           type: "basic",
           iconUrl: chrome.runtime.getURL("assets/icon.png"),
-          title: "로그인 성공",
-          message: "Pind에 성공적으로 로그인되었습니다."
+          title: "Login Successful",
+          message: "Successfully logged into Pind."
         });
 
       }
     } catch (error) {
-      console.error("백그라운드: 토큰 처리 중 오류 발생:", error);
+      console.error("Background: Error occurred during token processing:", error);
       chrome.notifications.create({
         type: "basic",
         iconUrl: chrome.runtime.getURL("assets/icon.png"),
-        title: "로그인 오류",
-        message: "로그인 처리 중 오류가 발생했습니다."
+        title: "Login Error",
+        message: "An error occurred during login processing."
       });
     }
   }
